@@ -57,7 +57,7 @@ async def start_game(data: StartGameRequest):
     shop_data = shop_doc.to_dict()
 
     # Use shop commission_rate or default 10%
-    commission_rate = shop_data.get("commission_rate", 0.1)
+    commission_rate = shop_data.get("commission_rate", 0.2)
 
     # Calculate commission
     total_bet = data.total_cards * data.bet_per_card
@@ -168,7 +168,7 @@ async def save_game(req: SaveGameRequest):
         shop_data = shop_doc.to_dict()
 
     # Use shop commission_rate or default 10%
-        commission_rate = shop_data.get("commission_rate", 0.1)
+        commission_rate = shop_data.get("commission_rate", 0.2)
 
     # Calculate commission
         total_bet = req.total_cards * req.bet_per_card
