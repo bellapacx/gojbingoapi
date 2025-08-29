@@ -258,3 +258,30 @@ async def finish_round(shop_id: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+class CommissionUpdate(BaseModel):
+    commission_rate: float
+
+
+@router.put("/shops/{shop_id}/commission")
+def update_commission(
+    shop_id: str,
+    body: CommissionUpdate,
+    authorization: str = Header(...)
+):
+    verify_token(authorization.split(" ")[-1])
+
+    # Query the shop document by shop_id field
+    shop_query = db.collection("shops").where("shop_id", "==", shop_id).limit(1).get()
+
+    if not shop_query:
+        raise HTTPException(status_code=404, detail="Shop not found")
+
+    shop_ref = shop_query[0].reference
+    shop_ref.update({"commission_rate": body.commission_rate})
+
+    return {
+        "status": "updated",
+        "shop_id": shop_id,
+        "new_commission_rate": body.commission_rate
+    }
