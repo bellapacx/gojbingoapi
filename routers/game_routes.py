@@ -191,7 +191,16 @@ async def save_game(req: SaveGameRequest):
         }
 
         # Save round to Firestore (collection: roundsPerShop, doc: shop_id)
-        db.collection("roundsPerShop").document(req.shop_id).set(round_data)
+        # Check if document exists for this shop ID in roundsPerShop
+        round_doc_ref = db.collection("roundsPerShop").document(req.shop_id)
+        round_doc = round_doc_ref.get()
+        
+        if round_doc.exists:
+            # Document exists, update it
+            round_doc_ref.update(round_data)
+        else:
+            # Document doesn't exist, create it
+            round_doc_ref.set(round_data)
 
         # === Update or create daily report document ===
         total_bet = req.total_cards * req.bet_per_card
