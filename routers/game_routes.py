@@ -159,22 +159,18 @@ async def save_game(req: SaveGameRequest):
         now = datetime.utcnow().isoformat()
         today_str = datetime.utcnow().strftime("%Y-%m-%d")
 
-        print(f"Processing request for shop_id: {req.shop_id}")  # Debug
-
-        # Fetch shop document - FIXED: Check if shop_query has documents
+        # Fetch shop document
         shop_query = db.collection("shops").where("shop_id", "==", req.shop_id).limit(1).get()
-        if len(shop_query) == 0:
-            print(f"Shop not found: {req.shop_id}")  # Debug
-            raise HTTPException(status_code=404, detail="Shop not found")
+        if not shop_query:
+           raise HTTPException(status_code=404, detail="Shop not found")
     
         shop_doc = shop_query[0]
         shop_data = shop_doc.to_dict()
-        print(f"Shop found: {shop_data}")  # Debug
 
-        # Use shop commission_rate or default 20%
+    # Use shop commission_rate or default 10%
         commission_rate = shop_data.get("commission_rate", 0.2)
 
-        # Calculate commission
+    # Calculate commission
         total_bet = req.total_cards * req.bet_per_card
         commission_amount = total_bet * commission_rate
 
@@ -188,36 +184,28 @@ async def save_game(req: SaveGameRequest):
             "selectedCards": req.selected_cards,
             "interval": req.interval,
             "language": req.language,
-            "commissionRate": commission_rate,
+            "commissionRate": req.commission_rate,
             "winningPattern": req.winning_pattern,
             "started_at": now,
             "status": "ongoing",
-            "updated_at": now
         }
 
-        print(f"Round data to save: {round_data}")  # Debug
-
+        # Save round to Firestore (collection: roundsPerShop, doc: shop_id)
         # Check if document exists for this shop ID in roundsPerShop
         round_doc_ref = db.collection("roundsPerShop").document(req.shop_id)
         round_doc = round_doc_ref.get()
         
         if round_doc.exists:
-            print(f"Document exists for shop {req.shop_id}, updating...")  # Debug
-            # Use set with merge=True instead of update to handle all fields
-            round_doc_ref.set(round_data, merge=True)
+            # Document exists, update it
+            round_doc_ref.update(round_data)
         else:
-            print(f"Document doesn't exist for shop {req.shop_id}, creating...")  # Debug
+            # Document doesn't exist, create it
             round_doc_ref.set(round_data)
 
-        # Verify the document was created/updated
-        verify_doc = round_doc_ref.get()
-        if verify_doc.exists:
-            print(f"Successfully saved round data for shop {req.shop_id}")  # Debug
-            print(f"Saved data: {verify_doc.to_dict()}")  # Debug
-        else:
-            print(f"ERROR: Failed to save round data for shop {req.shop_id}")  # Debug
-
         # === Update or create daily report document ===
+        total_bet = req.total_cards * req.bet_per_card
+        commission_amount = total_bet * req.commission_rate
+
         report_ref = db.collection("shop_reports") \
                        .document(req.shop_id) \
                        .collection("daily_reports") \
@@ -230,8 +218,7 @@ async def save_game(req: SaveGameRequest):
             report_data["placed_bets"] += total_bet
             report_data["awarded"] += req.prize
             report_data["net_cash"] += total_bet - req.prize
-            report_data["company_commission"] += commission_amount
-            report_data["updated_at"] = now
+            report_data["company_commission"] += (total_bet - req.prize) * 0.2
         else:
             report_data = {
                 "date": today_str,
@@ -239,18 +226,12 @@ async def save_game(req: SaveGameRequest):
                 "placed_bets": total_bet,
                 "awarded": req.prize,
                 "net_cash": total_bet - req.prize,
-                "company_commission": commission_amount,
-                "created_at": now,
-                "updated_at": now
+                "company_commission": (total_bet - req.prize) * 0.2
             }
 
         report_ref.set(report_data)
-        print(f"Daily report updated for shop {req.shop_id}")  # Debug
 
         return {"round_id": round_id}
     
     except Exception as e:
-        print(f"Error occurred: {str(e)}")  # Debug
-        import traceback
-        print(f"Traceback: {traceback.format_exc()}")  # Debug
         raise HTTPException(status_code=500, detail=str(e))
