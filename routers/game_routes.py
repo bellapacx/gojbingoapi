@@ -203,35 +203,5 @@ async def save_game(req: SaveGameRequest):
             round_doc_ref.set(round_data)
 
         # === Update or create daily report document ===
-        total_bet = req.total_cards * req.bet_per_card
-        commission_amount = total_bet * req.commission_rate
-
-        report_ref = db.collection("shop_reports") \
-                       .document(req.shop_id) \
-                       .collection("daily_reports") \
-                       .document(today_str)
-        report_doc = report_ref.get()
-
-        if report_doc.exists:
-            report_data = report_doc.to_dict()
-            report_data["play_count"] += 1
-            report_data["placed_bets"] += total_bet
-            report_data["awarded"] += req.prize
-            report_data["net_cash"] += total_bet - req.prize
-            report_data["company_commission"] += (total_bet - req.prize) * 0.2
-        else:
-            report_data = {
-                "date": today_str,
-                "play_count": 1,
-                "placed_bets": total_bet,
-                "awarded": req.prize,
-                "net_cash": total_bet - req.prize,
-                "company_commission": (total_bet - req.prize) * 0.2
-            }
-
-        report_ref.set(report_data)
-
-        return {"round_id": round_id}
-    
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
